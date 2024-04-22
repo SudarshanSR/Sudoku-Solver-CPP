@@ -1,8 +1,9 @@
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <set>
 
-using Possibilities = std::array<int, 9>;
+using Possibilities = std::set<int>;
 
 struct Cell {
   int value = 0;
@@ -87,15 +88,13 @@ struct Board {
   };
 
   Possibilities possibilities(int row, int col) {
-    Possibilities possibilities = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-
     // Checks if current cell is occupied
 
     if (rows[row][col]->value != 0) {
-      possibilities.fill(0);
-
-      return possibilities;
+      return {};
     }
+
+    Possibilities possibilities = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 
     // Checks for numbers in current row and column
 
@@ -103,13 +102,13 @@ struct Board {
       int rowVal = rows[row][i]->value;
 
       if (rowVal != 0) {
-        possibilities[rowVal - 1] = 0;
+        possibilities.erase(rowVal);
       }
 
       int colVal = cols[col][i]->value;
 
       if (colVal != 0) {
-        possibilities[colVal - 1] = 0;
+        possibilities.erase(colVal);
       }
     }
 
@@ -123,7 +122,7 @@ struct Board {
         int val = board[i][j].value;
 
         if (val != 0) {
-          possibilities[val - 1] = 0;
+          possibilities.erase(val);
         }
       }
     }
@@ -146,22 +145,22 @@ struct Board {
       for (int value = 1; value <= 9; ++value) {
         for (int row = 0; row < 9; ++row) {
           if (std::ranges::count_if(possibilitiesRows[row], [value](Possibilities *possibilities) {
-                return (*possibilities)[value - 1] != 0;
+                return possibilities->contains(value);
               }) != 8)
             continue;
 
           int valueCol =
               std::ranges::find_if(possibilitiesRows[row],
-                                   [value](Possibilities *possibilities) { return (*possibilities)[value - 1] == 0; }) -
+                                   [value](Possibilities *possibilities) { return !possibilities->contains(value); }) -
               possibilitiesRows[row].begin();
 
           rows[row][valueCol]->value = value;
 
-          possibilitiesRows[row][valueCol]->fill(0);
+          possibilitiesRows[row][valueCol]->clear();
 
           for (int i = 0; i < 9; ++i) {
-            possibilitiesArray[i][valueCol][value - 1] = 0;
-            possibilitiesArray[row][i][value - 1] = 0;
+            possibilitiesArray[i][valueCol].erase(value);
+            possibilitiesArray[row][i].erase(value);
           }
 
           int startRow = row - row % 3;
@@ -169,7 +168,7 @@ struct Board {
 
           for (int i = startRow; i < startRow + 3; ++i) {
             for (int j = startCol; j < startCol + 3; ++j) {
-              possibilitiesArray[i][j][value - 1] = 0;
+              possibilitiesArray[i][j].erase(value);
             }
           }
 
@@ -178,22 +177,22 @@ struct Board {
 
         for (int col = 0; col < 9; ++col) {
           if (std::ranges::count_if(possibilitiesCols[col], [value](Possibilities *possibilities) {
-                return (*possibilities)[value - 1] != 0;
+                return possibilities->contains(value);
               }) != 8)
             continue;
 
           int valueRow =
               std::ranges::find_if(possibilitiesCols[col],
-                                   [value](Possibilities *possibilities) { return (*possibilities)[value - 1] == 0; }) -
+                                   [value](Possibilities *possibilities) { return !possibilities->contains(value); }) -
               possibilitiesCols[col].begin();
 
           cols[col][valueRow]->value = value;
 
-          possibilitiesArray[valueRow][col].fill(0);
+          possibilitiesArray[valueRow][col].clear();
 
           for (int i = 0; i < 9; ++i) {
-            possibilitiesArray[valueRow][i][value - 1] = 0;
-            possibilitiesArray[i][col][value - 1] = 0;
+            possibilitiesArray[valueRow][i].erase(value);
+            possibilitiesArray[i][col].erase(value);
           }
 
           int startRow = valueRow - valueRow % 3;
@@ -201,7 +200,7 @@ struct Board {
 
           for (int i = startRow; i < startRow + 3; ++i) {
             for (int j = startCol; j < startCol + 3; ++j) {
-              possibilitiesArray[i][j][value - 1] = 0;
+              possibilitiesArray[i][j].erase(value);
             }
           }
 
@@ -216,7 +215,7 @@ struct Board {
 
             for (int i = 0; i < 3; ++i) {
               for (int j = 0; j < 3; ++j) {
-                if (possibilitiesArray[row + i][col + j][value - 1] == 0) {
+                if (!possibilitiesArray[row + i][col + j].contains(value)) {
                   zeroCount += 1;
                 } else {
                   valueRow = row + i;
@@ -230,11 +229,11 @@ struct Board {
 
             board[valueRow][valueCol].value = value;
 
-            possibilitiesArray[valueRow][valueCol].fill(0);
+            possibilitiesArray[valueRow][valueCol].clear();
 
             for (int i = 0; i < 9; ++i) {
-              (*possibilitiesRows[valueRow][i])[value - 1] = 0;
-              (*possibilitiesCols[valueCol][i])[value - 1] = 0;
+              possibilitiesRows[valueRow][i]->erase(value);
+              possibilitiesCols[valueCol][i]->erase(value);
             }
 
             int startRow = valueRow - valueRow % 3;
@@ -242,7 +241,7 @@ struct Board {
 
             for (int i = startRow; i < startRow + 3; ++i) {
               for (int j = startCol; j < startCol + 3; ++j) {
-                possibilitiesArray[i][j][value - 1] = 0;
+                possibilitiesArray[i][j].erase(value);
               }
             }
 
@@ -258,21 +257,21 @@ struct Board {
           for (int jStart = 0; jStart < 9; jStart += 3) {
             int rowCount =
                 std::count_if(possibilitiesRows[i].begin() + jStart, possibilitiesRows[i].begin() + jStart + 3,
-                              [value](Possibilities *possibilities) { return (*possibilities)[value - 1] == value; });
+                              [value](Possibilities *possibilities) { return possibilities->contains(value); });
             int colCount =
                 std::count_if(possibilitiesCols[i].begin() + jStart, possibilitiesCols[i].begin() + jStart + 3,
-                              [value](Possibilities *possibilities) { return (*possibilities)[value - 1] == value; });
+                              [value](Possibilities *possibilities) { return possibilities->contains(value); });
 
             int gridRowCount = 0;
             int gridColCount = 0;
 
             for (int rowOffset = 0; rowOffset < 3; ++rowOffset) {
               for (int colOffset = 0; colOffset < 3; ++colOffset) {
-                if (possibilitiesArray[iStart + rowOffset][jStart + colOffset][value - 1] == value) {
+                if (possibilitiesArray[iStart + rowOffset][jStart + colOffset].contains(value)) {
                   gridRowCount += 1;
                 }
 
-                if (possibilitiesArray[jStart + rowOffset][iStart + colOffset][value - 1] == value) {
+                if (possibilitiesArray[jStart + rowOffset][iStart + colOffset].contains(value)) {
                   gridColCount += 1;
                 }
               }
@@ -283,7 +282,7 @@ struct Board {
                 if (col == jStart || col == jStart + 1 || col == jStart + 2)
                   continue;
 
-                possibilitiesArray[i][col][value - 1] = 0;
+                possibilitiesArray[i][col].erase(value);
               }
             }
 
@@ -292,16 +291,14 @@ struct Board {
                 if (row == jStart || row == jStart + 1 || row == jStart + 2)
                   continue;
 
-                possibilitiesArray[row][i][value - 1] = 0;
+                possibilitiesArray[row][i].erase(value);
               }
             }
 
-            int totalRowCount = std::ranges::count_if(possibilitiesRows[i], [value](Possibilities *possibilities) {
-              return (*possibilities)[value - 1] == value;
-            });
-            int totalColumnCount = std::ranges::count_if(possibilitiesCols[i], [value](Possibilities *possibilities) {
-              return (*possibilities)[value - 1] == value;
-            });
+            int totalRowCount = std::ranges::count_if(
+                possibilitiesRows[i], [value](Possibilities *possibilities) { return possibilities->contains(value); });
+            int totalColumnCount = std::ranges::count_if(
+                possibilitiesCols[i], [value](Possibilities *possibilities) { return possibilities->contains(value); });
 
             if (totalRowCount && totalRowCount == rowCount) {
               for (int rowOffset = 0; rowOffset < 3; ++rowOffset) {
@@ -309,7 +306,7 @@ struct Board {
                   continue;
 
                 for (int colOffset = 0; colOffset < 3; ++colOffset) {
-                  possibilitiesArray[iStart + rowOffset][jStart + colOffset][value - 1] = 0;
+                  possibilitiesArray[iStart + rowOffset][jStart + colOffset].erase(value);
                 }
               }
             }
@@ -320,7 +317,7 @@ struct Board {
                   continue;
 
                 for (int rowOffset = 0; rowOffset < 3; ++rowOffset) {
-                  possibilitiesArray[jStart + rowOffset][iStart + colOffset][value - 1] = 0;
+                  possibilitiesArray[jStart + rowOffset][iStart + colOffset].erase(value);
                 }
               }
             }
@@ -335,16 +332,15 @@ struct Board {
           if (std::ranges::count_if(possibilitiesArray[row][col], [](int const x) { return x == 0; }) != 8)
             continue;
 
-          int const val = std::ranges::find_if(possibilitiesArray[row][col], [](int const x) { return x != 0; }) -
-                          possibilitiesArray[row][col].begin();
+          int const val = *possibilitiesArray[row][col].begin();
 
           board[row][col].value = val + 1;
 
-          possibilitiesArray[row][col].fill(0);
+          possibilitiesArray[row][col].clear();
 
           for (int i = 0; i < 9; ++i) {
-            (*possibilitiesRows[row][i])[val] = 0;
-            (*possibilitiesCols[col][i])[val] = 0;
+            possibilitiesRows[row][i]->erase(val);
+            possibilitiesCols[col][i]->erase(val);
           }
 
           int startRow = row - row % 3;
@@ -352,7 +348,7 @@ struct Board {
 
           for (int i = startRow; i < startRow + 3; ++i) {
             for (int j = startCol; j < startCol + 3; ++j) {
-              possibilitiesArray[i][j][val] = 0;
+              possibilitiesArray[i][j].erase(val);
             }
           }
 
@@ -375,11 +371,11 @@ struct Board {
 
               copy[row][col].value = value;
 
-              copy.possibilitiesArray[row][col].fill(0);
+              copy.possibilitiesArray[row][col].clear();
 
               for (int i = 0; i < 9; ++i) {
-                copy.possibilitiesArray[row][i][value - 1] = 0;
-                copy.possibilitiesArray[i][col][value - 1] = 0;
+                copy.possibilitiesArray[row][i].erase(value);
+                copy.possibilitiesArray[i][col].erase(value);
               }
 
               int startRow = row - row % 3;
@@ -387,7 +383,7 @@ struct Board {
 
               for (int i = startRow; i < startRow + 3; ++i) {
                 for (int j = startCol; j < startCol + 3; ++j) {
-                  copy.possibilitiesArray[i][j][value - 1] = 0;
+                  copy.possibilitiesArray[i][j].erase(value);
                 }
               }
 
