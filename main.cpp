@@ -7,7 +7,7 @@ using Number = unsigned short;
 using Possibilities = std::set<Number>;
 
 struct Board {
-  int count = 0;
+  int count = 81;
   std::array<std::array<Number, 9>, 9> board = {};
   std::array<std::array<Possibilities, 9>, 9> possibilitiesBoard = {};
   std::array<std::array<Possibilities *, 9>, 9> possibilitiesRows = {};
@@ -16,82 +16,26 @@ struct Board {
   explicit Board(std::array<std::array<Number, 9>, 9> const &values) {
     for (int row = 0; row < 9; ++row) {
       for (int col = 0; col < 9; ++col) {
-        this->board[row][col] = values[row][col];
-
-        if (!this->board[row][col])
-          ++count;
+        this->possibilitiesBoard[row][col] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+        this->possibilitiesRows[row][col] = &(this->possibilitiesBoard[row][col]);
+        this->possibilitiesCols[col][row] = &(this->possibilitiesBoard[row][col]);
       }
     }
 
     for (int row = 0; row < 9; ++row) {
       for (int col = 0; col < 9; ++col) {
-        this->possibilitiesBoard[row][col] = this->possibilities(row, col);
-        this->possibilitiesRows[row][col] = &(this->possibilitiesBoard[row][col]);
-        this->possibilitiesCols[col][row] = &(this->possibilitiesBoard[row][col]);
+        if (!values[row][col]) {
+          this->board[row][col] = 0;
+
+          continue;
+        }
+
+        this->setCell(row, col, values[row][col]);
       }
     }
   }
 
-  Board(Board &board) {
-    this->count = board.count;
-
-    for (int row = 0; row < 9; ++row) {
-      for (int col = 0; col < 9; ++col) {
-        this->board[row][col] = board.board[row][col];
-      }
-    }
-
-    for (int row = 0; row < 9; ++row) {
-      for (int col = 0; col < 9; ++col) {
-        this->possibilitiesBoard[row][col] = this->possibilities(row, col);
-        this->possibilitiesRows[row][col] = &(this->possibilitiesBoard[row][col]);
-        this->possibilitiesCols[col][row] = &(this->possibilitiesBoard[row][col]);
-      }
-    }
-  };
-
-  Possibilities possibilities(int row, int col) {
-    // Checks if current cell is occupied
-
-    if (this->board[row][col] != 0) {
-      return {};
-    }
-
-    Possibilities possibilities = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-    // Checks for numbers in current row and column
-
-    for (int i = 0; i < 9; ++i) {
-      Number rowVal = this->board[row][i];
-
-      if (rowVal != 0) {
-        possibilities.erase(rowVal);
-      }
-
-      Number colVal = this->board[i][col];
-
-      if (colVal != 0) {
-        possibilities.erase(colVal);
-      }
-    }
-
-    // Checks for numbers in the current grid
-
-    int startRow = row - row % 3;
-    int startCol = col - col % 3;
-
-    for (int i = startRow; i < startRow + 3; ++i) {
-      for (int j = startCol; j < startCol + 3; ++j) {
-        Number val = this->board[i][j];
-
-        if (val != 0) {
-          possibilities.erase(val);
-        }
-      }
-    }
-
-    return possibilities;
-  };
+  Board(Board &board) : Board(board.board) {}
 
   void setCell(int const row, int const col, Number const value) {
     this->board[row][col] = value;
