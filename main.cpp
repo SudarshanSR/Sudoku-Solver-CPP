@@ -117,8 +117,10 @@ struct Board {
   }
 
   void checkRows(Number const value, int const row, int const rowStart) {
+    std::array<Possibilities *, 9> possibilitiesArray = this->possibilitiesRows[row];
+
     int totalCount =
-        std::ranges::count_if(this->possibilitiesRows[row], [value](Possibilities *p) { return p->contains(value); });
+        std::ranges::count_if(possibilitiesArray, [value](Possibilities *p) { return p->contains(value); });
 
     for (int colStart = 0; colStart < 9; colStart += 3) {
       int gridCount = 0;
@@ -129,18 +131,17 @@ struct Board {
                                    [value](Possibilities p) { return p.contains(value); });
       }
 
-      int rowCount = std::count_if(this->possibilitiesRows[row].begin() + colStart,
-                                   this->possibilitiesRows[row].begin() + colStart + 3,
+      int rowCount = std::count_if(possibilitiesArray.begin() + colStart, possibilitiesArray.begin() + colStart + 3,
                                    [value](Possibilities *p) { return p->contains(value); });
 
       if (gridCount && gridCount == rowCount) {
         for (int col = 0; col < colStart; ++col) {
-          if (this->possibilitiesCols[col][row]->erase(value))
+          if (possibilitiesArray[col]->erase(value))
             --totalCount;
         }
 
         for (int col = colStart + 3; col < 9; ++col) {
-          if (this->possibilitiesCols[col][row]->erase(value))
+          if (possibilitiesArray[col]->erase(value))
             --totalCount;
         }
       }
@@ -151,7 +152,7 @@ struct Board {
             continue;
 
           for (int colOffset = 0; colOffset < 3; ++colOffset) {
-            this->possibilitiesRows[rowStart + rowOffset][colStart + colOffset]->erase(value);
+            this->possibilitiesBoard[rowStart + rowOffset][colStart + colOffset].erase(value);
           }
         }
       }
@@ -159,8 +160,10 @@ struct Board {
   }
 
   void checkCols(Number const value, int const col, int const colStart) {
+    std::array<Possibilities *, 9> &possibilitiesArray = this->possibilitiesCols[col];
+
     int totalCount =
-        std::ranges::count_if(this->possibilitiesCols[col], [value](Possibilities *p) { return p->contains(value); });
+        std::ranges::count_if(possibilitiesArray, [value](Possibilities *p) { return p->contains(value); });
 
     for (int rowStart = 0; rowStart < 9; rowStart += 3) {
       int gridCount = 0;
@@ -171,18 +174,17 @@ struct Board {
                                    [value](Possibilities p) { return p.contains(value); });
       }
 
-      int colCount = std::count_if(this->possibilitiesCols[col].begin() + rowStart,
-                                   this->possibilitiesCols[col].begin() + rowStart + 3,
+      int colCount = std::count_if(possibilitiesArray.begin() + rowStart, possibilitiesArray.begin() + rowStart + 3,
                                    [value](Possibilities *p) { return p->contains(value); });
 
       if (gridCount && gridCount == colCount) {
         for (int row = 0; row < rowStart; ++row) {
-          if (this->possibilitiesRows[row][col]->erase(value))
+          if (possibilitiesArray[row]->erase(value))
             --totalCount;
         }
 
         for (int row = rowStart + 3; row < 9; ++row) {
-          if (this->possibilitiesRows[row][col]->erase(value))
+          if (possibilitiesArray[row]->erase(value))
             --totalCount;
         }
       }
@@ -193,7 +195,7 @@ struct Board {
             continue;
 
           for (int rowOffset = 0; rowOffset < 3; ++rowOffset) {
-            this->possibilitiesCols[colStart + colOffset][rowStart + rowOffset]->erase(value);
+            this->possibilitiesBoard[rowStart + rowOffset][colStart + colOffset].erase(value);
           }
         }
       }
