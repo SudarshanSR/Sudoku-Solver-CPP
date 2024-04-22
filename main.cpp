@@ -5,11 +5,10 @@
 
 using Number = unsigned short;
 using Possibilities = std::set<Number>;
-using Row = std::array<Number, 9>;
 
 struct Board {
   int count = 0;
-  std::array<Row, 9> board = {};
+  std::array<std::array<Number, 9>, 9> board = {};
   std::array<std::array<Possibilities, 9>, 9> possibilitiesBoard = {};
   std::array<std::array<Possibilities *, 9>, 9> possibilitiesRows = {};
   std::array<std::array<Possibilities *, 9>, 9> possibilitiesCols = {};
@@ -316,7 +315,7 @@ struct Board {
 
     stream << '\n';
 
-    for (Row const &row : board.board) {
+    for (std::array<Number, 9> const &row : board.board) {
       stream << "|";
 
       for (Number const &cell : row) {
