@@ -9,16 +9,8 @@ using Number = unsigned short;
 using Possibilities = std::array<bool, 9>;
 using Cell = std::pair<unsigned short, unsigned short>;
 
-struct Board {
-  std::array<std::array<Number, 9>, 9> board = {};
-  std::array<std::array<Possibilities, 9>, 9> possibilitiesBoard = {};
-  std::array<std::array<Possibilities *, 9>, 9> possibilitiesRows = {};
-  std::array<std::array<Possibilities *, 9>, 9> possibilitiesCols = {};
-  std::map<Number, unsigned short> remainingValues = {
-      {1, 9}, {2, 9}, {3, 9}, {4, 9}, {5, 9}, {6, 9}, {7, 9}, {8, 9}, {9, 9},
-  };
-  std::set<Cell> remainingCells;
-
+class Board {
+public:
   explicit Board(std::array<std::array<Number, 9>, 9> const &values) {
     for (unsigned short row = 0; row < 9; ++row) {
       for (unsigned short col = 0; col < 9; ++col) {
@@ -41,7 +33,148 @@ struct Board {
     }
   }
 
+  bool solve() {
+    short countCopy = this->remainingCells.size();
+
+    while (!this->remainingCells.empty()) {
+      for (auto const &[value, _] : this->remainingValues) {
+        for (unsigned short row = 0; row < 9; row += 3) {
+          for (unsigned short col = 0; col < 9; col += 3) {
+            unsigned short zeroCount = 0;
+            unsigned short valueRow = 0;
+            unsigned short valueCol = 0;
+
+            for (unsigned short i = 0; i < 3; ++i) {
+              for (unsigned short j = 0; j < 3; ++j) {
+                if (!this->possibilitiesBoard[row + i][col + j][value - 1]) {
+                  zeroCount += 1;
+                } else {
+                  valueRow = row + i;
+                  valueCol = col + j;
+                }
+              }
+            }
+
+            if (zeroCount != 8)
+              continue;
+
+            this->setCell(valueRow, valueCol, value);
+          }
+        }
+
+        for (unsigned short i = 0; i < 9; ++i) {
+          // Checks if there are any unique cells in a row and col where only this number can occur
+
+          this->checkRow(value, i);
+
+          this->checkCol(value, i);
+
+          // Narrows down cells where this value should occur at
+
+          unsigned short iStart = i - i % 3;
+
+          narrowRows(value, i, iStart);
+
+          narrowCols(value, i, iStart);
+        }
+      }
+
+      // Checks if theres any cell where only one number is possible
+
+      for (auto const &[row, col] : this->remainingCells) {
+        if (std::ranges::count(this->possibilitiesBoard[row][col], 0) != 8)
+          continue;
+
+        this->setCell(
+            row, col,
+            std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin() + 1
+        );
+      }
+
+      // Checks if all useful moves have been used
+
+      if (size_t count = this->remainingCells.size(); count != countCopy) {
+        countCopy = count;
+
+        continue;
+      }
+
+      // Starts guessing values
+
+      auto const &[row, col] = *this->remainingCells.begin();
+
+      size_t const index =
+          std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin();
+
+      if (std::ranges::count(this->possibilitiesBoard[row][col], 0) == 9) {
+        return false;
+      }
+
+      Board copy(*this);
+
+      copy.setCell(row, col, index + 1);
+
+      if (copy.solve()) {
+        this->board = copy.board;
+
+        return true;
+      }
+
+      this->possibilitiesBoard[row][col][index] = 0;
+
+      if (std::ranges::count(this->possibilitiesBoard[row][col], 0) == 9) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  friend std::ostream &operator<<(std::ostream &stream, Board const &board) {
+    stream << '\n';
+
+    for (int _ = 0; _ < 37; ++_) {
+      stream << '-';
+    }
+
+    stream << '\n';
+
+    for (std::array<Number, 9> const &row : board.board) {
+      stream << "|";
+
+      for (Number const &cell : row) {
+        if (cell) {
+          stream << ' ' << cell << ' ';
+        } else {
+          stream << "   ";
+        }
+
+        stream << '|';
+      }
+
+      stream << '\n';
+
+      for (int _ = 0; _ < 37; ++_) {
+        stream << '-';
+      }
+
+      stream << '\n';
+    }
+
+    return stream;
+  }
+
+private:
   Board(Board const &board) : Board(board.board) {}
+
+  std::array<std::array<Number, 9>, 9> board = {};
+  std::array<std::array<Possibilities, 9>, 9> possibilitiesBoard = {};
+  std::array<std::array<Possibilities *, 9>, 9> possibilitiesRows = {};
+  std::array<std::array<Possibilities *, 9>, 9> possibilitiesCols = {};
+  std::map<Number, unsigned short> remainingValues = {
+      {1, 9}, {2, 9}, {3, 9}, {4, 9}, {5, 9}, {6, 9}, {7, 9}, {8, 9}, {9, 9},
+  };
+  std::set<Cell> remainingCells;
 
   void setCell(unsigned short const row, unsigned short const col, Number const value) {
     this->board[row][col] = value;
@@ -181,137 +314,6 @@ struct Board {
             this->possibilitiesCols[col].begin(),
         col, value
     );
-  }
-
-  bool solve() {
-    short countCopy = this->remainingCells.size();
-
-    while (!this->remainingCells.empty()) {
-      for (auto const &[value, _] : this->remainingValues) {
-        for (unsigned short row = 0; row < 9; row += 3) {
-          for (unsigned short col = 0; col < 9; col += 3) {
-            unsigned short zeroCount = 0;
-            unsigned short valueRow = 0;
-            unsigned short valueCol = 0;
-
-            for (unsigned short i = 0; i < 3; ++i) {
-              for (unsigned short j = 0; j < 3; ++j) {
-                if (!this->possibilitiesBoard[row + i][col + j][value - 1]) {
-                  zeroCount += 1;
-                } else {
-                  valueRow = row + i;
-                  valueCol = col + j;
-                }
-              }
-            }
-
-            if (zeroCount != 8)
-              continue;
-
-            this->setCell(valueRow, valueCol, value);
-          }
-        }
-
-        for (unsigned short i = 0; i < 9; ++i) {
-          // Checks if there are any unique cells in a row and col where only this number can occur
-
-          this->checkRow(value, i);
-
-          this->checkCol(value, i);
-
-          // Narrows down cells where this value should occur at
-
-          unsigned short iStart = i - i % 3;
-
-          narrowRows(value, i, iStart);
-
-          narrowCols(value, i, iStart);
-        }
-      }
-
-      // Checks if theres any cell where only one number is possible
-
-      for (auto const &[row, col] : this->remainingCells) {
-        if (std::ranges::count(this->possibilitiesBoard[row][col], 0) != 8)
-          continue;
-
-        this->setCell(
-            row, col,
-            std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin() + 1
-        );
-      }
-
-      // Checks if all useful moves have been used
-
-      if (size_t count = this->remainingCells.size(); count != countCopy) {
-        countCopy = count;
-
-        continue;
-      }
-
-      // Starts guessing values
-
-      auto const &[row, col] = *this->remainingCells.begin();
-
-      size_t const index =
-          std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin();
-
-      if (std::ranges::count(this->possibilitiesBoard[row][col], 0) == 9) {
-        return false;
-      }
-
-      Board copy(*this);
-
-      copy.setCell(row, col, index + 1);
-
-      if (copy.solve()) {
-        this->board = copy.board;
-
-        return true;
-      }
-
-      this->possibilitiesBoard[row][col][index] = 0;
-
-      if (std::ranges::count(this->possibilitiesBoard[row][col], 0) == 9) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  friend std::ostream &operator<<(std::ostream &stream, Board board) {
-    stream << '\n';
-
-    for (int _ = 0; _ < 37; ++_) {
-      stream << '-';
-    }
-
-    stream << '\n';
-
-    for (std::array<Number, 9> const &row : board.board) {
-      stream << "|";
-
-      for (Number const &cell : row) {
-        if (cell) {
-          stream << ' ' << cell << ' ';
-        } else {
-          stream << "   ";
-        }
-
-        stream << '|';
-      }
-
-      stream << '\n';
-
-      for (int _ = 0; _ < 37; ++_) {
-        stream << '-';
-      }
-
-      stream << '\n';
-    }
-
-    return stream;
   }
 };
 
