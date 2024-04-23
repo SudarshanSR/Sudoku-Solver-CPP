@@ -110,7 +110,7 @@ public:
       size_t const index =
           std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin();
 
-      Board copy(*this);
+      Board copy(this->board);
 
       copy.setCell(row, col, index + 1);
 
@@ -165,8 +165,6 @@ public:
   }
 
 private:
-  Board(Board const &board) : Board(board.board) {}
-
   std::array<std::array<Number, 9>, 9> board = {};
   std::array<std::array<Possibilities, 9>, 9> possibilitiesBoard = {};
   std::array<std::array<Possibilities *, 9>, 9> possibilitiesRows = {};
