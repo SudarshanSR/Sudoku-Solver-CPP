@@ -103,12 +103,12 @@ public:
 
       auto const &[row, col] = *this->remainingCells.begin();
 
-      size_t const index =
-          std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin();
-
       if (std::ranges::count(this->possibilitiesBoard[row][col], 0) == 9) {
         return false;
       }
+
+      size_t const index =
+          std::ranges::find(this->possibilitiesBoard[row][col], 1) - this->possibilitiesBoard[row][col].begin();
 
       Board copy(*this);
 
