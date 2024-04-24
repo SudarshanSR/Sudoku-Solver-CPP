@@ -37,28 +37,10 @@ public:
     short countCopy = this->remainingCells.size();
 
     while (!this->remainingCells.empty()) {
-      for (auto const &[value, _] : this->remainingValues) {
+      for (auto const [value, _] : this->remainingValues) {
         for (unsigned short row = 0; row < 9; row += 3) {
           for (unsigned short col = 0; col < 9; col += 3) {
-            unsigned short zeroCount = 0;
-            unsigned short valueRow = 0;
-            unsigned short valueCol = 0;
-
-            for (unsigned short i = 0; i < 3; ++i) {
-              for (unsigned short j = 0; j < 3; ++j) {
-                if (!this->possibilitiesBoard[row + i][col + j][value - 1]) {
-                  zeroCount += 1;
-                } else {
-                  valueRow = row + i;
-                  valueCol = col + j;
-                }
-              }
-            }
-
-            if (zeroCount != 8)
-              continue;
-
-            this->setCell(valueRow, valueCol, value);
+            this->checkGrid(row, col, value);
           }
         }
 
@@ -73,9 +55,9 @@ public:
 
           unsigned short iStart = i - i % 3;
 
-          narrowRows(value, i, iStart);
+          this->narrowRows(value, i, iStart);
 
-          narrowCols(value, i, iStart);
+          this->narrowCols(value, i, iStart);
         }
       }
 
@@ -198,11 +180,11 @@ private:
       this->remainingValues.erase(value);
     }
 
-    remainingCells.erase({row, col});
+    this->remainingCells.erase({row, col});
   }
 
   void narrowRows(Number const value, unsigned short const row, unsigned short const rowStart) {
-    std::array<Possibilities *, 9> possibilitiesArray = this->possibilitiesRows[row];
+    std::array<Possibilities *, 9> const &possibilitiesArray = this->possibilitiesRows[row];
 
     for (unsigned short colStart = 0; colStart < 9; colStart += 3) {
       unsigned short gridCount = 0;
@@ -247,7 +229,7 @@ private:
   }
 
   void narrowCols(Number const value, unsigned short const col, unsigned short const colStart) {
-    std::array<Possibilities *, 9> &possibilitiesArray = this->possibilitiesCols[col];
+    std::array<Possibilities *, 9> const &possibilitiesArray = this->possibilitiesCols[col];
 
     for (unsigned short rowStart = 0; rowStart < 9; rowStart += 3) {
       unsigned short gridCount = 0;
@@ -292,26 +274,52 @@ private:
   }
 
   void checkRow(Number const value, unsigned short const row) {
-    if (std::ranges::count_if(this->possibilitiesRows[row], [value](Possibilities *p) { return (*p)[value - 1]; }) != 1)
+    std::array<Possibilities *, 9> const &possibilitiesArray = this->possibilitiesRows[row];
+
+    if (std::ranges::count_if(possibilitiesArray, [value](Possibilities *p) { return (*p)[value - 1]; }) != 1)
       return;
 
     this->setCell(
         row,
-        std::ranges::find_if(this->possibilitiesRows[row], [value](Possibilities *p) { return (*p)[value - 1]; }) -
-            this->possibilitiesRows[row].begin(),
+        std::ranges::find_if(possibilitiesArray, [value](Possibilities *p) { return (*p)[value - 1]; }) -
+            possibilitiesArray.begin(),
         value
     );
   }
 
   void checkCol(Number const value, unsigned short const col) {
-    if (std::ranges::count_if(this->possibilitiesCols[col], [value](Possibilities *p) { return (*p)[value - 1]; }) != 1)
+    std::array<Possibilities *, 9> const &possibilitiesArray = this->possibilitiesCols[col];
+
+    if (std::ranges::count_if(possibilitiesArray, [value](Possibilities *p) { return (*p)[value - 1]; }) != 1)
       return;
 
     this->setCell(
-        std::ranges::find_if(this->possibilitiesCols[col], [value](Possibilities *p) { return (*p)[value - 1]; }) -
-            this->possibilitiesCols[col].begin(),
+        std::ranges::find_if(possibilitiesArray, [value](Possibilities *p) { return (*p)[value - 1]; }) -
+            possibilitiesArray.begin(),
         col, value
     );
+  }
+
+  void checkGrid(unsigned short const row, unsigned short const col, Number const value) {
+    unsigned short zeroCount = 0;
+    unsigned short valueRow = 0;
+    unsigned short valueCol = 0;
+
+    for (unsigned short i = 0; i < 3; ++i) {
+      for (unsigned short j = 0; j < 3; ++j) {
+        if (!this->possibilitiesBoard[row + i][col + j][value - 1]) {
+          zeroCount += 1;
+        } else {
+          valueRow = row + i;
+          valueCol = col + j;
+        }
+      }
+    }
+
+    if (zeroCount != 8)
+      return;
+
+    this->setCell(valueRow, valueCol, value);
   }
 };
 
