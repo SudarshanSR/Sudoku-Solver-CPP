@@ -11,7 +11,7 @@ using Number = std::uint16_t;
 using Row = std::uint16_t;
 using Col = std::uint16_t;
 using Count = std::size_t;
-using Possibilities = std::array<bool, 9>;
+using Possibilities = std::set<Number>;
 using Cell = std::pair<Row, Col>;
 
 class Board {
@@ -42,7 +42,7 @@ class Board {
 
     void check_col(Number number, Col col);
 
-    void check_grid(Number number, Row row, Col col);
+    void check_grid(Number number, Row row_start, Col col_start);
 };
 
 #endif

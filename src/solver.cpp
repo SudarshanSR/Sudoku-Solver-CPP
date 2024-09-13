@@ -7,9 +7,7 @@
 Board::Board(std::array<std::array<Number, 9>, 9> const &values) {
     for (Row row = 0; row < 9; ++row)
         for (Col col = 0; col < 9; ++col) {
-            this->possibilities_board_[row][col] = {true, true, true,
-                                                    true, true, true,
-                                                    true, true, true};
+            this->possibilities_board_[row][col] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
             this->possibilities_rows_[row][col] =
                 &this->possibilities_board_[row][col];
             this->possibilities_cols_[col][row] =
@@ -57,14 +55,11 @@ bool Board::solve() {
         // Checks if there's any cell where only one number is possible
 
         for (auto const &[row, col] : this->remaining_cells_) {
-            if (std::ranges::count(this->possibilities_board_[row][col], 0) !=
-                8)
+            if (this->possibilities_board_[row][col].size() != 8)
                 continue;
 
             this->set_cell(
-                row, col,
-                std::ranges::find(this->possibilities_board_[row][col], 1) -
-                    this->possibilities_board_[row][col].begin() + 1
+                row, col, *this->possibilities_board_[row][col].cbegin()
             );
         }
 
@@ -79,18 +74,16 @@ bool Board::solve() {
 
         // Starts guessing values
 
-        auto const &[row, col] = *this->remaining_cells_.begin();
+        auto const &[row, col] = *this->remaining_cells_.cbegin();
 
-        if (std::ranges::count(this->possibilities_board_[row][col], 0) == 9)
+        if (this->possibilities_board_[row][col].empty())
             return false;
 
-        std::size_t const index =
-            std::ranges::find(this->possibilities_board_[row][col], 1) -
-            this->possibilities_board_[row][col].begin();
+        Number const number = *this->possibilities_board_[row][col].cbegin();
 
         Board copy(this->board_);
 
-        copy.set_cell(row, col, index + 1);
+        copy.set_cell(row, col, number);
 
         if (copy.solve()) {
             this->board_ = copy.board_;
@@ -98,9 +91,9 @@ bool Board::solve() {
             return true;
         }
 
-        this->possibilities_board_[row][col][index] = false;
+        this->possibilities_board_[row][col].erase(number);
 
-        if (std::ranges::count(this->possibilities_board_[row][col], 0) == 9)
+        if (this->possibilities_board_[row][col].empty())
             return false;
     }
 
@@ -138,20 +131,22 @@ std::ostream &operator<<(std::ostream &stream, Board const &board) {
 void Board::set_cell(Row const row, Col const col, Number const number) {
     this->board_[row][col] = number;
 
-    this->possibilities_board_[row][col].fill(false);
+    this->possibilities_board_[row][col].clear();
 
     for (Possibilities *p : this->possibilities_rows_[row])
-        (*p)[number - 1] = false;
+        p->erase(number);
 
     for (Possibilities *p : this->possibilities_cols_[col])
-        (*p)[number - 1] = false;
+        p->erase(number);
 
     Row const start_row = row - row % 3;
     Col const start_col = col - col % 3;
 
     for (Row i = start_row; i < start_row + 3; ++i)
         for (Col j = start_col; j < start_col + 3; ++j)
-            this->possibilities_board_[i][j][number - 1] = false;
+            this->possibilities_board_[i][j].erase(number);
+
+    --this->remaining_numbers_[number];
 
     this->remaining_cells_.erase({row, col});
 }
@@ -166,34 +161,32 @@ void Board::narrow_rows(
         Count grid_count = 0;
 
         for (std::uint16_t offset = 0; offset < 3; ++offset)
-            grid_count += std::count_if(
-                this->possibilities_board_[row_start + offset].begin() +
-                    col_start,
-                this->possibilities_board_[row_start + offset].begin() +
-                    col_start + 3,
-                [number](Possibilities const &p) { return p[number - 1]; }
+            grid_count += std::ranges::count_if(
+                this->possibilities_board_[row_start + offset] |
+                    std::views::drop(col_start) | std::views::take(3),
+                [number](Possibilities const &p) { return p.contains(number); }
             );
 
-        Count const row_count = std::count_if(
-            possibilities_array.begin() + col_start,
-            possibilities_array.begin() + col_start + 3,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+        Count const row_count = std::ranges::count_if(
+            possibilities_array | std::views::drop(col_start) |
+                std::views::take(3),
+            [number](Possibilities const *p) { return p->contains(number); }
         );
 
         if (grid_count && grid_count == row_count) {
             for (Col col = 0; col < col_start; ++col)
-                (*possibilities_array[col])[number - 1] = false;
+                possibilities_array[col]->erase(number);
 
             for (Col col = col_start + 3; col < 9; ++col)
-                (*possibilities_array[col])[number - 1] = false;
+                possibilities_array[col]->erase(number);
         }
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         );
 
-        if (total_count && total_count == row_count) {
+        if (total_count && total_count == row_count)
             for (Row rowOffset = 0; rowOffset < 3; ++rowOffset) {
                 if (row_start + rowOffset == row)
                     continue;
@@ -201,9 +194,8 @@ void Board::narrow_rows(
                 for (Col colOffset = 0; colOffset < 3; ++colOffset)
                     this->possibilities_board_[row_start + rowOffset]
                                               [col_start + colOffset]
-                                              [number - 1] = false;
+                                                  .erase(number);
             }
-        }
     }
 }
 
@@ -217,31 +209,29 @@ void Board::narrow_cols(
         Count grid_count = 0;
 
         for (std::uint16_t offset = 0; offset < 3; ++offset)
-            grid_count += std::count_if(
-                this->possibilities_board_[row_start + offset].begin() +
-                    col_start,
-                this->possibilities_board_[row_start + offset].begin() +
-                    col_start + 3,
-                [number](Possibilities const &p) { return p[number - 1]; }
+            grid_count += std::ranges::count_if(
+                this->possibilities_board_[row_start + offset] |
+                    std::views::drop(col_start) | std::views::take(3),
+                [number](Possibilities const &p) { return p.contains(number); }
             );
 
-        Count const col_count = std::count_if(
-            possibilities_array.begin() + row_start,
-            possibilities_array.begin() + row_start + 3,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+        Count const col_count = std::ranges::count_if(
+            possibilities_array | std::views::drop(row_start) |
+                std::views::take(3),
+            [number](Possibilities const *p) { return p->contains(number); }
         );
 
         if (grid_count && grid_count == col_count) {
             for (Row row = 0; row < row_start; ++row)
-                (*possibilities_array[row])[number - 1] = false;
+                possibilities_array[row]->erase(number);
 
             for (Row row = row_start + 3; row < 9; ++row)
-                (*possibilities_array[row])[number - 1] = false;
+                possibilities_array[row]->erase(number);
         }
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         );
 
         if (total_count && total_count == col_count)
@@ -252,18 +242,18 @@ void Board::narrow_cols(
                 for (Row rowOffset = 0; rowOffset < 3; ++rowOffset)
                     this->possibilities_board_[row_start + rowOffset]
                                               [col_start + colOffset]
-                                              [number - 1] = false;
+                                                  .erase(number);
             }
     }
 }
 
-void Board::check_row(Number const number, unsigned short const row) {
+void Board::check_row(Number const number, Row const row) {
     std::array<Possibilities *, 9> const &possibilities_array =
         this->possibilities_rows_[row];
 
     if (std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         ) != 1)
         return;
 
@@ -271,7 +261,7 @@ void Board::check_row(Number const number, unsigned short const row) {
         row,
         std::ranges::find_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         ) - possibilities_array.begin(),
         number
     );
@@ -283,37 +273,38 @@ void Board::check_col(Number const number, Col const col) {
 
     if (std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         ) != 1)
         return;
 
     this->set_cell(
         std::ranges::find_if(
             possibilities_array,
-            [number](Possibilities const *p) { return (*p)[number - 1]; }
+            [number](Possibilities const *p) { return p->contains(number); }
         ) - possibilities_array.begin(),
         col, number
     );
 }
 
-void Board::check_grid(Number const number, Row const row, Col const col) {
+void Board::check_grid(
+    Number const number, Row const row_start, Col const col_start
+) {
     Count zero_count = 0;
-    Row number_row = 0;
-    Col number_col = 0;
+    Row row = 0;
+    Col col = 0;
 
-    for (std::uint16_t i = 0; i < 3; ++i) {
-        for (std::uint16_t j = 0; j < 3; ++j) {
-            if (!this->possibilities_board_[row + i][col + j][number - 1]) {
+    for (std::uint16_t i = 0; i < 3; ++i)
+        for (std::uint16_t j = 0; j < 3; ++j)
+            if (!this->possibilities_board_[row_start + i][col_start + j]
+                     .contains(number)) {
                 zero_count += 1;
             } else {
-                number_row = row + i;
-                number_col = col + j;
+                row = row_start + i;
+                col = col_start + j;
             }
-        }
-    }
 
     if (zero_count != 8)
         return;
 
-    this->set_cell(number_row, number_col, number);
+    this->set_cell(row, col, number);
 }
