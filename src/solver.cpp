@@ -79,12 +79,12 @@ void Board::solve() {
 
         if (this->data_.possibilities_board_[row][col].empty()) {
             while (this->data_.possibilities_board_[row][col].empty()) {
-                ChangedState const &state = states_.top();
+                ChangedState &state = states_.top();
 
                 row = state.row;
                 col = state.col;
 
-                this->data_ = state.data;
+                this->data_ = std::move(state.data);
 
                 this->data_.possibilities_board_[row][col].erase(state.number);
 
