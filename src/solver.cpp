@@ -164,13 +164,17 @@ void Board::narrow_rows(
             grid_count += std::ranges::count_if(
                 this->possibilities_board_[row_start + offset] |
                     std::views::drop(col_start) | std::views::take(3),
-                [number](Possibilities const &p) { return p.contains(number); }
+                [number](Possibilities const &p) -> bool {
+                    return p.contains(number);
+                }
             );
 
         Count const row_count = std::ranges::count_if(
             possibilities_array | std::views::drop(col_start) |
                 std::views::take(3),
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         );
 
         if (grid_count && grid_count == row_count) {
@@ -183,7 +187,9 @@ void Board::narrow_rows(
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         );
 
         if (total_count && total_count == row_count)
@@ -212,13 +218,17 @@ void Board::narrow_cols(
             grid_count += std::ranges::count_if(
                 this->possibilities_board_[row_start + offset] |
                     std::views::drop(col_start) | std::views::take(3),
-                [number](Possibilities const &p) { return p.contains(number); }
+                [number](Possibilities const &p) -> bool {
+                    return p.contains(number);
+                }
             );
 
         Count const col_count = std::ranges::count_if(
             possibilities_array | std::views::drop(row_start) |
                 std::views::take(3),
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         );
 
         if (grid_count && grid_count == col_count) {
@@ -231,7 +241,9 @@ void Board::narrow_cols(
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         );
 
         if (total_count && total_count == col_count)
@@ -253,7 +265,9 @@ void Board::check_row(Number const number, Row const row) {
 
     if (std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         ) != 1)
         return;
 
@@ -261,7 +275,9 @@ void Board::check_row(Number const number, Row const row) {
         row,
         std::ranges::find_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         ) - possibilities_array.begin(),
         number
     );
@@ -273,14 +289,18 @@ void Board::check_col(Number const number, Col const col) {
 
     if (std::ranges::count_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         ) != 1)
         return;
 
     this->set_cell(
         std::ranges::find_if(
             possibilities_array,
-            [number](Possibilities const *p) { return p->contains(number); }
+            [number](Possibilities const *p) -> bool {
+                return p->contains(number);
+            }
         ) - possibilities_array.begin(),
         col, number
     );
