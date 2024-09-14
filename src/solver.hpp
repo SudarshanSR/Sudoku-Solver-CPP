@@ -4,8 +4,10 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <ostream>
 #include <set>
+#include <stack>
 
 using Number = std::uint16_t;
 using Row = std::uint16_t;
@@ -18,19 +20,31 @@ class Board {
   public:
     explicit Board(std::array<std::array<Number, 9>, 9> const &values);
 
-    bool solve();
+    void solve();
 
     friend std::ostream &operator<<(std::ostream &stream, Board const &board);
 
   private:
-    std::array<std::array<Number, 9>, 9> board_ = {};
-    std::array<std::array<Possibilities, 9>, 9> possibilities_board_ = {};
-    std::array<std::array<Possibilities *, 9>, 9> possibilities_rows_ = {};
-    std::array<std::array<Possibilities *, 9>, 9> possibilities_cols_ = {};
-    std::map<Number, Count> remaining_numbers_ = {
-        {1, 9}, {2, 9}, {3, 9}, {4, 9}, {5, 9}, {6, 9}, {7, 9}, {8, 9}, {9, 9},
+    struct Data final {
+        std::array<std::array<Number, 9>, 9> board_ = {};
+        std::array<std::array<Possibilities, 9>, 9> possibilities_board_ = {};
+        std::array<std::array<Possibilities *, 9>, 9> possibilities_rows_ = {};
+        std::array<std::array<Possibilities *, 9>, 9> possibilities_cols_ = {};
+        std::map<Number, Count> remaining_numbers_ = {
+            {1, 9}, {2, 9}, {3, 9}, {4, 9}, {5, 9},
+            {6, 9}, {7, 9}, {8, 9}, {9, 9},
+        };
+        std::set<Cell> remaining_cells_;
+    } data_;
+
+    struct ChangedState final {
+        Row row;
+        Col col;
+        Number number;
+        Data data;
     };
-    std::set<Cell> remaining_cells_;
+
+    inline static std::stack<ChangedState> states_ = {};
 
     void set_cell(Row row, Col col, Number number);
 
