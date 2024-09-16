@@ -23,32 +23,35 @@ check_count(std::array<Possibilities *, 9> const &array, Number const number) {
 }
 
 std::optional<Cell> check_count(
-    std::array<std::array<Possibilities, 9>, 9> const &board,
-    Number const number, Row const row_start, Col const col_start
+    std::map<std::pair<std::uint16_t, std::uint16_t>, Possibilities *> const
+        &grid,
+    Number const number
 ) {
     Count zero_count = 9;
 
     std::optional<Cell> cell;
 
-    for (std::uint16_t i = 0; i < 3; ++i)
-        for (std::uint16_t j = 0; j < 3; ++j) {
-            if (!board[row_start + i][col_start + j].contains(number))
-                continue;
+    for (auto const &[pair, possibilities] : grid) {
+        if (!possibilities->contains(number))
+            continue;
 
-            zero_count -= 1;
+        zero_count -= 1;
 
-            if (zero_count == 7)
-                return {};
+        if (zero_count == 7)
+            return {};
 
-            cell = {row_start + i, col_start + j};
-        }
+        cell = pair;
+    }
 
     return cell;
 }
 } // namespace
 
 Board::Board(std::array<std::array<Number, 9>, 9> const &values) {
-    for (Row row = 0; row < 9; ++row)
+    for (Row row = 0; row < 9; ++row) {
+        Row const row_mod = row % 3;
+        Row const row_floor = row / 3;
+
         for (Col col = 0; col < 9; ++col) {
             this->data_.possibilities_board_[row][col] = {1, 2, 3, 4, 5,
                                                           6, 7, 8, 9};
@@ -57,8 +60,24 @@ Board::Board(std::array<std::array<Number, 9>, 9> const &values) {
             this->data_.possibilities_cols_[col][row] =
                 &this->data_.possibilities_board_[row][col];
 
+            {
+                std::pair<std::uint16_t, std::uint16_t> const &grid_cell{
+                    row_mod, col % 3
+                };
+
+                Col const col_mod = col / 3;
+
+                this->data_.possibilities_grids_row_wise_[row_floor][col_mod]
+                                                         [grid_cell] =
+                    &this->data_.possibilities_board_[row][col];
+                this->data_.possibilities_grids_col_wise_[col_mod][row_floor]
+                                                         [grid_cell] =
+                    &this->data_.possibilities_board_[row][col];
+            }
+
             this->data_.remaining_cells_.insert({row, col});
         }
+    }
 
     for (Row row = 0; row < 9; ++row)
         for (Col col = 0; col < 9; ++col)
@@ -74,9 +93,9 @@ void Board::solve() {
             if (!count)
                 continue;
 
-            for (Row row = 0; row < 9; row += 3)
-                for (Col col = 0; col < 9; col += 3)
-                    this->check_grid(number, row, col);
+            for (std::uint16_t x = 0; x < 3; ++x)
+                for (std::uint16_t y = 0; y < 3; ++y)
+                    this->check_grid(number, x, y);
 
             for (std::uint16_t i = 0; i < 9; ++i) {
                 // Checks if there are any unique cells in a row and col where
@@ -179,37 +198,33 @@ void Board::set_cell(Row const row, Col const col, Number const number) {
 
     this->data_.possibilities_board_[row][col].clear();
 
-    for (Possibilities *p : this->data_.possibilities_rows_[row])
+    for (Possibilities *const p : this->data_.possibilities_rows_[row])
         p->erase(number);
 
-    for (Possibilities *p : this->data_.possibilities_cols_[col])
+    for (Possibilities *const p : this->data_.possibilities_cols_[col])
         p->erase(number);
 
-    Row const start_row = row - row % 3;
-    Col const start_col = col - col % 3;
-
-    for (std::array<Possibilities, 9> &array :
-         this->data_.possibilities_board_ | std::views::drop(start_row) |
-             std::views::take(3))
-        for (Possibilities &possibilities :
-             array | std::views::drop(start_col) | std::views::take(3))
-            possibilities.erase(number);
+    for (Possibilities *const possibilities :
+         this->data_.possibilities_grids_row_wise_[row / 3][col / 3] |
+             std::views::values)
+        possibilities->erase(number);
 
     --this->data_.remaining_numbers_[number];
 
     this->data_.remaining_cells_.erase({row, col});
 }
 
-void Board::narrow_rows(
-    Number const number, Row const row, Row const row_start
-) {
+void Board::narrow_rows(Number const number, Row const row, Row const row_start)
+    const {
     std::array<Possibilities *, 9> const &possibilities_array =
         this->data_.possibilities_rows_[row];
 
-    for (Col col_start = 0; col_start < 9; col_start += 3) {
+    auto chunks = possibilities_array | std::views::chunk(3);
+    auto grid = this->data_.possibilities_grids_row_wise_[row / 3];
+
+    for (std::uint16_t i = 0; i < 3; ++i) {
         Count const row_count = std::ranges::count_if(
-            possibilities_array | std::views::drop(col_start) |
-                std::views::take(3),
+            chunks[i],
             [number](Possibilities const *p) -> bool {
                 return p->contains(number);
             }
@@ -218,26 +233,21 @@ void Board::narrow_rows(
         if (!row_count)
             continue;
 
-        Count grid_count = 0;
+        Count const grid_count = std::ranges::count_if(
+            grid[i] | std::views::values,
+            [number](Possibilities const *const p) -> bool {
+                return p->contains(number);
+            }
+        );
 
-        for (std::uint16_t offset = 0; offset < 3; ++offset)
-            grid_count += std::ranges::count_if(
-                this->data_.possibilities_rows_[row_start + offset] |
-                    std::views::drop(col_start) | std::views::take(3),
-                [number](Possibilities const *const p) -> bool {
-                    return p->contains(number);
-                }
-            );
+        if (grid_count == row_count)
+            for (auto const &[index, array] : chunks | std::views::enumerate) {
+                if (index == i)
+                    continue;
 
-        if (grid_count && grid_count == row_count) {
-            for (Possibilities *const possibilities :
-                 possibilities_array | std::views::take(col_start))
-                possibilities->erase(number);
-
-            for (Possibilities *const possibilities :
-                 possibilities_array | std::views::drop(col_start + 3))
-                possibilities->erase(number);
-        }
+                for (Possibilities *const possibilities : array)
+                    possibilities->erase(number);
+            }
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
@@ -246,31 +256,29 @@ void Board::narrow_rows(
             }
         );
 
-        if (!total_count || total_count != row_count)
+        if (total_count != row_count)
             continue;
 
-        for (Row row_offset = 0; row_offset < 3; ++row_offset) {
-            if (row_start + row_offset == row)
+        for (auto const &[pair, possibilities] : grid[i]) {
+            if (row_start + pair.first == row)
                 continue;
 
-            for (Possibilities *const possibilities :
-                 this->data_.possibilities_rows_[row_start + row_offset] |
-                     std::views::drop(col_start) | std::views::take(3))
-                possibilities->erase(number);
+            possibilities->erase(number);
         }
     }
 }
 
-void Board::narrow_cols(
-    Number const number, Col const col, Col const col_start
-) {
+void Board::narrow_cols(Number const number, Col const col, Col const col_start)
+    const {
     std::array<Possibilities *, 9> const &possibilities_array =
         this->data_.possibilities_cols_[col];
 
-    for (Row row_start = 0; row_start < 9; row_start += 3) {
+    auto chunks = possibilities_array | std::views::chunk(3);
+    auto grid = this->data_.possibilities_grids_col_wise_[col / 3];
+
+    for (std::uint16_t i = 0; i < 3; ++i) {
         Count const col_count = std::ranges::count_if(
-            possibilities_array | std::views::drop(row_start) |
-                std::views::take(3),
+            chunks[i],
             [number](Possibilities const *p) -> bool {
                 return p->contains(number);
             }
@@ -279,26 +287,21 @@ void Board::narrow_cols(
         if (!col_count)
             continue;
 
-        Count grid_count = 0;
+        Count const grid_count = std::ranges::count_if(
+            grid[i] | std::views::values,
+            [number](Possibilities const *const p) -> bool {
+                return p->contains(number);
+            }
+        );
 
-        for (std::uint16_t offset = 0; offset < 3; ++offset)
-            grid_count += std::ranges::count_if(
-                this->data_.possibilities_cols_[col_start + offset] |
-                    std::views::drop(row_start) | std::views::take(3),
-                [number](Possibilities const *const p) -> bool {
-                    return p->contains(number);
-                }
-            );
+        if (grid_count == col_count)
+            for (auto const &[index, array] : chunks | std::views::enumerate) {
+                if (index == i)
+                    continue;
 
-        if (grid_count && grid_count == col_count) {
-            for (Possibilities *const possibilities :
-                 possibilities_array | std::views::take(row_start))
-                possibilities->erase(number);
-
-            for (Possibilities *const possibilities :
-                 possibilities_array | std::views::drop(row_start + 3))
-                possibilities->erase(number);
-        }
+                for (Possibilities *const possibilities : array)
+                    possibilities->erase(number);
+            }
 
         Count const total_count = std::ranges::count_if(
             possibilities_array,
@@ -307,17 +310,14 @@ void Board::narrow_cols(
             }
         );
 
-        if (!total_count || total_count != col_count)
+        if (total_count != col_count)
             continue;
 
-        for (Col col_offset = 0; col_offset < 3; ++col_offset) {
-            if (col_start + col_offset == col)
+        for (auto const &[pair, possibilities] : grid[i]) {
+            if (col_start + pair.second == col)
                 continue;
 
-            for (Possibilities *const possibilities :
-                 this->data_.possibilities_cols_[col_start + col_offset] |
-                     std::views::drop(row_start) | std::views::take(3))
-                possibilities->erase(number);
+            possibilities->erase(number);
         }
     }
 }
@@ -342,15 +342,12 @@ void Board::check_col(Number const number, Col const col) {
     this->set_cell(*row, col, number);
 }
 
-void Board::check_grid(
-    Number const number, Row const row_start, Col const col_start
-) {
-    std::optional<Cell> const &cell = check_count(
-        this->data_.possibilities_board_, number, row_start, col_start
-    );
+void Board::check_grid(Number const number, Row const x, Col const y) {
+    std::optional<Cell> const &cell =
+        check_count(this->data_.possibilities_grids_row_wise_[x][y], number);
 
     if (!cell)
         return;
 
-    this->set_cell(cell->first, cell->second, number);
+    this->set_cell(3 * x + cell->first, 3 * y + cell->second, number);
 }
