@@ -4,7 +4,6 @@
 #include <array>
 #include <cstdint>
 #include <map>
-#include <memory>
 #include <ostream>
 #include <set>
 #include <stack>
